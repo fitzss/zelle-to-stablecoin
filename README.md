@@ -17,14 +17,12 @@ A Node.js application that automatically detects incoming Zelle payments (via Pl
 ## Prerequisites
 
 - Node.js 14+ and npm
-- Plaid developer account
-- Normie Tech API access (for production use)
 
 ## Installation
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/zelle-to-stablecoin.git
+git clone https://github.com/fitzss/zelle-to-stablecoin.git
 cd zelle-to-stablecoin
 ```
 
@@ -33,23 +31,9 @@ cd zelle-to-stablecoin
 npm install
 ```
 
-3. (Optional) Create a `.env` file in the root directory with your credentials:
-```
-# Plaid credentials
-PLAID_CLIENT_ID=your_client_id
-PLAID_SECRET=your_secret
-PLAID_ENV=sandbox
+3. **No configuration needed!** Demo credentials are already included in the code.
 
-# Normie Tech credentials
-NORMIE_PROJECT_ID=your_project_id
-NORMIE_API_KEY=your_api_key
-
-# Default wallet settings
-DEFAULT_BLOCKCHAIN=Sepolia
-DEFAULT_WALLET_ADDRESS=0x...
-```
-
-> **Note:** For quick testing, demo credentials are hardcoded in the application. You don't need to set up your own API keys to try it out.
+> **Note:** The application comes with hardcoded sandbox credentials for easy testing. No need to create a `.env` file or set up your own API keys.
 
 ## Usage
 
@@ -67,6 +51,32 @@ http://localhost:3001
    - Configure project-specific settings
    - Create test transactions
    - View transaction history
+   - See Plaid API activities in real-time
+
+## Online Deployment Options
+
+You can deploy this app online for others to use without having to run it locally:
+
+### Option 1: Render.com (Free & Easy)
+1. Create an account at [render.com](https://render.com)
+2. Choose "New Web Service"
+3. Connect to your GitHub repository
+4. Set Build Command: `npm install`
+5. Set Start Command: `node index.js`
+6. Choose Free plan and click "Create Web Service"
+
+### Option 2: Heroku
+1. Create an account at [heroku.com](https://heroku.com)
+2. Install Heroku CLI: `npm install -g heroku`
+3. Login: `heroku login`
+4. Create app: `heroku create`
+5. Deploy: `git push heroku main`
+
+### Option 3: Railway.app
+1. Go to [railway.app](https://railway.app)
+2. Connect your GitHub account
+3. Select your repository
+4. Deploy with default settings
 
 ## How It Works
 
@@ -100,7 +110,7 @@ Retrieve transaction history
 The application is currently configured to use Plaid Sandbox and mock stablecoin payouts for development purposes.
 
 To switch to production:
-1. Update the Plaid environment in the `.env` file
+1. Update the Plaid environment in the code
 2. Uncomment the actual API call in the `processStablecoinPayout` function
 3. Configure real wallet addresses and API keys
 
