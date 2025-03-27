@@ -89,6 +89,58 @@
         .status-processing {
             color: #2196F3;
         }
+        .activity-log {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 250px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        
+        .log-entry {
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .log-time {
+            color: #777;
+            font-size: 11px;
+        }
+        
+        .log-plaid {
+            color: #2c5282;
+        }
+        
+        .log-normie {
+            color: #276749;
+        }
+        
+        .log-error {
+            color: #c53030;
+        }
+        
+        .plaid-details {
+            margin-bottom: 20px;
+        }
+        
+        .status-indicator {
+            font-weight: bold;
+        }
+        
+        .status-connected {
+            color: #38a169;
+        }
+        
+        h3 {
+            margin-top: 15px;
+            margin-bottom: 10px;
+            color: #444;
+            font-size: 1.1em;
+        }
     </style>
 </head>
 <body>
@@ -149,6 +201,30 @@
                         <button type="submit">Save Settings</button>
                     </form>
                 </div>
+                
+                <!-- New Technical Details Section -->
+                <div class="card">
+                    <h2>Technical Details</h2>
+                    <h3>Plaid Integration</h3>
+                    <div class="plaid-details">
+                        <div>
+                            <strong>Status:</strong> <span class="status-indicator" id="plaidStatus">Connecting...</span>
+                        </div>
+                        <div>
+                            <strong>Connected Institution:</strong> <span id="plaidInstitution">First Platypus Bank</span>
+                        </div>
+                        <div>
+                            <strong>Connection Method:</strong> <span>Plaid Sandbox API</span>
+                        </div>
+                        <div>
+                            <strong>Environment:</strong> <span>Sandbox</span>
+                        </div>
+                    </div>
+                    <h3>API Activity Log</h3>
+                    <div class="activity-log" id="activityLog">
+                        <div class="loading">Loading activity...</div>
+                    </div>
+                </div>
             </div>
 
             <div class="right-panel">
@@ -163,6 +239,70 @@
     <script>
         const PORT = 3001;
         
+        // Add activity log functionality
+        function addActivityLog(message, type = 'info') {
+            const logContainer = document.getElementById('activityLog');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            entry.innerHTML = `<span class="log-time">[${timestamp}]</span> ${message}`;
+            
+            logContainer.prepend(entry);
+            
+            // Limit log entries
+            if (logContainer.children.length > 50) {
+                logContainer.removeChild(logContainer.lastChild);
+            }
+        }
+        
+        // Update Plaid connection status
+        async function updatePlaidStatus() {
+            try {
+                const response = await fetch(`http://localhost:${PORT}/api/plaid-status`);
+                const status = await response.json();
+                
+                const statusElement = document.getElementById('plaidStatus');
+                
+                if (status.connected) {
+                    statusElement.textContent = 'Connected';
+                    statusElement.className = 'status-indicator status-connected';
+                    document.getElementById('plaidInstitution').textContent = status.institution || 'First Platypus Bank';
+                    addActivityLog(`Plaid connection verified: ${status.message}`, 'plaid');
+                } else {
+                    statusElement.textContent = 'Disconnected';
+                    statusElement.className = 'status-indicator status-error';
+                    addActivityLog(`Plaid connection issue: ${status.message}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error checking Plaid status:', error);
+                document.getElementById('plaidStatus').textContent = 'Error';
+                addActivityLog('Failed to check Plaid connection status', 'error');
+            }
+        }
+        
+        // Load activity logs
+        async function loadActivityLogs() {
+            try {
+                const response = await fetch(`http://localhost:${PORT}/api/activity-logs`);
+                const logs = await response.json();
+                
+                const logContainer = document.getElementById('activityLog');
+                logContainer.innerHTML = '';
+                
+                logs.forEach(log => {
+                    addActivityLog(log.message, log.type);
+                });
+                
+                if (logs.length === 0) {
+                    addActivityLog('No activity recorded yet', 'info');
+                }
+            } catch (error) {
+                console.error('Error loading activity logs:', error);
+                addActivityLog('Failed to load activity logs', 'error');
+            }
+        }
+
         // Load payout settings
         async function loadPayoutSettings() {
             try {
@@ -302,9 +442,13 @@
         // Initial load
         loadPayoutSettings();
         fetchTransactions();
+        updatePlaidStatus();
+        loadActivityLogs();
 
-        // Refresh transactions every 30 seconds
+        // Refresh transactions and logs periodically
         setInterval(fetchTransactions, 30000);
+        setInterval(updatePlaidStatus, 15000);
+        setInterval(loadActivityLogs, 5000);
     </script>
 </body>
 </html> 

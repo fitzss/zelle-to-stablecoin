@@ -15,6 +15,12 @@ const path = require('path');
 const axios = require('axios'); // Add axios for Normie Tech API calls
 require('dotenv').config();
 
+// Demo credentials for easy testing - these are hardcoded sample values
+const DEMO_PLAID_CLIENT_ID = '67deff5f90625d0022c97aa2';  // Example demo ID
+const DEMO_PLAID_SECRET = '886f7cb2fe22d354a6316a35a445a9'; // Example demo secret
+const DEMO_NORMIE_PROJECT_ID = 'pillur';
+const DEMO_NORMIE_API_KEY = 'qyX6rOMQUUnZf74ee6KWyfeZ4zWa/V6/3UoSkGaXjVI=';
+
 const app = express();
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -30,10 +36,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// Normie Tech Configuration
+// Normie Tech Configuration - use demo values if .env values not found
 const NORMIE_API_URL = 'https://api-sandbox.normie.tech';
-const NORMIE_PROJECT_ID = process.env.NORMIE_PROJECT_ID || 'your_project_id';
-const NORMIE_API_KEY = process.env.NORMIE_API_KEY || 'your_api_key';
+const NORMIE_PROJECT_ID = process.env.NORMIE_PROJECT_ID || DEMO_NORMIE_PROJECT_ID;
+const NORMIE_API_KEY = process.env.NORMIE_API_KEY || DEMO_NORMIE_API_KEY;
 
 // Payout Configuration
 const PAYOUT_CONFIG = {
@@ -41,16 +47,16 @@ const PAYOUT_CONFIG = {
   payoutPeriod: 'Instant',
   blockchain: process.env.DEFAULT_BLOCKCHAIN || 'Sepolia',
   currency: 'USDC',
-  walletAddress: process.env.DEFAULT_WALLET_ADDRESS || 'your_wallet_address'
+  walletAddress: process.env.DEFAULT_WALLET_ADDRESS || '0x50b8430Cbf6B470A63a5aa1e331A93a68CFD5BE9'
 };
 
-// Initialize Plaid client
+// Initialize Plaid client with demo credentials if .env values not found
 const config = new Configuration({
-  basePath: PlaidEnvironments[process.env.PLAID_ENV],
+  basePath: PlaidEnvironments[process.env.PLAID_ENV || 'sandbox'],
   baseOptions: {
     headers: {
-      'PLAID-CLIENT-ID': process.env.PLAID_CLIENT_ID,
-      'PLAID-SECRET': process.env.PLAID_SECRET,
+      'PLAID-CLIENT-ID': process.env.PLAID_CLIENT_ID || DEMO_PLAID_CLIENT_ID,
+      'PLAID-SECRET': process.env.PLAID_SECRET || DEMO_PLAID_SECRET,
       'Plaid-Version': '2020-09-14'
     },
   },
@@ -64,20 +70,38 @@ let cursor = null;
 let transactionLog = [];
 let projectSettings = {}; // Add a place to store project settings
 
+// Add activity log tracking
+const activityLogs = [];
+
+function logActivity(message, type = 'info') {
+  const logEntry = {
+    timestamp: new Date(),
+    message,
+    type
+  };
+  activityLogs.unshift(logEntry); // Add to beginning of array
+  
+  // Limit log entries to 100
+  if (activityLogs.length > 100) {
+    activityLogs.pop();
+  }
+  
+  console.log(`[${type.toUpperCase()}] ${message}`);
+  return logEntry;
+}
+
 // Add stablecoin payout function
 const processStablecoinPayout = async (amount, projectId) => {
   try {
     // Log payout attempt
-    console.log(`Initiating stablecoin payout for amount: ${amount} USDC, Project ID: ${projectId}`);
+    logActivity(`Initiating stablecoin payout for amount: ${amount} USDC, Project ID: ${projectId}`, 'normie');
     
     // Get project specific settings or use defaults
     const settings = projectSettings[projectId] || PAYOUT_CONFIG;
-    console.log(`Using settings for project ${projectId}:`, settings);
+    logActivity(`Using settings for project ${projectId}: ${settings.blockchain} -> ${settings.walletAddress}`, 'normie');
     
     // Log API details for debugging (but mask sensitive info)
-    console.log('Normie Tech API URL:', NORMIE_API_URL);
-    console.log('Normie Project ID:', NORMIE_PROJECT_ID);
-    console.log('API Key length:', NORMIE_API_KEY ? NORMIE_API_KEY.length : 'Not set');
+    logActivity('Preparing Normie Tech API request', 'normie');
     
     // Create the request payload
     const payload = {
@@ -92,7 +116,7 @@ const processStablecoinPayout = async (amount, projectId) => {
       }
     };
     
-    console.log('Request payload:', JSON.stringify(payload, null, 2));
+    logActivity(`Request payload created for ${payload.currency} payout on ${payload.blockchain}`, 'normie');
     
     // Temporarily comment out the actual API call and return a mock success for testing
     /*
@@ -104,7 +128,7 @@ const processStablecoinPayout = async (amount, projectId) => {
     });
     
     // Log successful payout
-    console.log('Payout successful:', response.data);
+    logActivity('Payout successful via Normie Tech API', 'normie');
 
     return {
       status: 'success',
@@ -116,7 +140,7 @@ const processStablecoinPayout = async (amount, projectId) => {
     */
     
     // Return a mock success response for testing
-    console.log('Returning mock success response for testing');
+    logActivity('Returning mock success response (production would call Normie Tech API)', 'normie');
     return {
       status: 'success',
       blockchain: settings.blockchain,
@@ -126,10 +150,7 @@ const processStablecoinPayout = async (amount, projectId) => {
     };
     
   } catch (error) {
-    console.error('Payout failed with error:', error);
-    console.error('Error response data:', error.response?.data);
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
+    logActivity(`Payout failed: ${error.message}`, 'error');
     
     return {
       status: 'failed',
@@ -166,6 +187,7 @@ const logTransaction = async (transaction, projectId) => {
 // Create a sandbox public token
 const createSandboxToken = async () => {
   try {
+    logActivity('Creating Plaid Sandbox public token for First Platypus Bank', 'plaid');
     const response = await client.sandboxPublicTokenCreate({
       institution_id: 'ins_109508', // First Platypus Bank
       initial_products: ['transactions'],
@@ -173,9 +195,10 @@ const createSandboxToken = async () => {
         webhook: 'https://yourdomain.com/api/plaid/webhook',
       },
     });
+    logActivity('Plaid Sandbox public token created successfully', 'plaid');
     return response.data.public_token;
   } catch (error) {
-    console.error('Error creating sandbox token:', error);
+    logActivity(`Error creating Plaid Sandbox token: ${error.message}`, 'error');
     throw error;
   }
 };
@@ -183,11 +206,13 @@ const createSandboxToken = async () => {
 // Exchange public token for access token
 const exchangeToken = async (public_token) => {
   try {
+    logActivity('Exchanging Plaid public token for access token', 'plaid');
     const response = await client.itemPublicTokenExchange({ public_token });
     storedAccessToken = response.data.access_token;
+    logActivity('Access token received and stored from Plaid', 'plaid');
     return storedAccessToken;
   } catch (error) {
-    console.error('Error exchanging token:', error);
+    logActivity(`Error exchanging Plaid token: ${error.message}`, 'error');
     throw error;
   }
 };
@@ -195,6 +220,7 @@ const exchangeToken = async (public_token) => {
 // Sync transactions
 const syncTransactions = async () => {
   try {
+    logActivity('Syncing transactions from Plaid', 'plaid');
     const request = { access_token: storedAccessToken };
     if (cursor) request.cursor = cursor;
 
@@ -202,26 +228,23 @@ const syncTransactions = async () => {
     const { added, next_cursor } = response.data;
 
     cursor = next_cursor;
+    logActivity(`Received ${added.length} new transactions from Plaid`, 'plaid');
 
     for (const tx of added) {
       if (tx.name.includes('Zelle')) {
         const memo = tx.payment_meta?.reference_number || tx.name;
         const matchedID = extractProjectID(memo);
         
+        logActivity(`Detected Zelle payment: $${tx.amount} with memo "${memo}"`, 'plaid');
+        
         // Enhanced logging
         const logEntry = await logTransaction(tx, matchedID);
         
-        console.log(`Zelle Payment detected:`);
-        console.log(`- From: ${tx.name}`);
-        console.log(`- Amount: ${tx.amount}`);
-        console.log(`- Memo: ${memo}`);
-        console.log(`- Matched Project ID: ${matchedID}`);
-        console.log(`- Timestamp: ${logEntry.timestamp}`);
-        console.log('---');
+        logActivity(`Matched to Project ID: ${matchedID || 'Not matched'}`, 'plaid');
       }
     }
   } catch (error) {
-    console.error('Error syncing transactions:', error);
+    logActivity(`Error syncing transactions: ${error.message}`, 'error');
     throw error;
   }
 };
@@ -297,6 +320,7 @@ app.post('/test/create-zelle', async (req, res) => {
     const { amount, projectId } = req.body;
     
     if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+      logActivity(`Invalid amount provided in test: ${amount}`, 'error');
       return res.status(400).json({
         error: 'Invalid amount',
         details: 'Amount must be a positive number'
@@ -304,6 +328,7 @@ app.post('/test/create-zelle', async (req, res) => {
     }
 
     if (!projectId || !projectId.match(/^PROJ-\d+$/)) {
+      logActivity(`Invalid project ID format in test: ${projectId}`, 'error');
       return res.status(400).json({
         error: 'Invalid project ID',
         details: 'Project ID must be in format PROJ-123'
@@ -321,6 +346,11 @@ app.post('/test/create-zelle', async (req, res) => {
       }
     };
 
+    logActivity(`Creating test Zelle transaction via Plaid Sandbox: $${amount} for ${projectId}`, 'plaid');
+    
+    // Simulate the process of Plaid detecting a transaction
+    logActivity('Triggering Plaid webhook to simulate transaction detection', 'plaid');
+    
     // Trigger transaction sync
     await client.sandboxItemFireWebhook({
       access_token: storedAccessToken,
@@ -331,10 +361,10 @@ app.post('/test/create-zelle', async (req, res) => {
     // Log the transaction
     const logEntry = await logTransaction(testTransaction, projectId);
     
-    console.log('Test Zelle transaction created:', testTransaction);
+    logActivity(`Test Zelle transaction successfully processed through Plaid Sandbox`, 'plaid');
     res.json({ success: true, transaction: testTransaction, log: logEntry });
   } catch (error) {
-    console.error('Error creating test transaction:', error);
+    logActivity(`Error creating test transaction: ${error.message}`, 'error');
     res.status(500).json({ 
       error: 'Error creating transaction',
       details: error.message
@@ -417,21 +447,57 @@ app.post('/api/transaction-settings', (req, res) => {
   }
 });
 
+// Add endpoint to get Plaid connection status
+app.get('/api/plaid-status', (req, res) => {
+  try {
+    const isConnected = !!storedAccessToken;
+    res.json({
+      connected: isConnected,
+      institution: 'First Platypus Bank',
+      message: isConnected ? 'Successfully connected to Plaid Sandbox' : 'Not connected to Plaid',
+      lastSyncTime: isConnected ? new Date().toISOString() : null
+    });
+  } catch (error) {
+    console.error('Error checking Plaid status:', error);
+    res.status(500).json({ 
+      connected: false,
+      error: 'Error checking Plaid status',
+      details: error.message
+    });
+  }
+});
+
+// Add endpoint to get activity logs
+app.get('/api/activity-logs', (req, res) => {
+  try {
+    res.json(activityLogs);
+  } catch (error) {
+    console.error('Error fetching activity logs:', error);
+    res.status(500).json({ 
+      error: 'Error fetching activity logs',
+      details: error.message
+    });
+  }
+});
+
 // Initialize the connection
 const initialize = async () => {
   try {
+    logActivity('Initializing Plaid Sandbox connection', 'plaid');
     const public_token = await createSandboxToken();
     await exchangeToken(public_token);
-    console.log('Successfully connected to Plaid Sandbox');
+    logActivity('Successfully connected to Plaid Sandbox', 'plaid');
     
     // Fire a test webhook with the required webhook_type
+    logActivity('Firing initial test webhook to simulate transactions update', 'plaid');
     await client.sandboxItemFireWebhook({
       access_token: storedAccessToken,
       webhook_code: 'DEFAULT_UPDATE',
       webhook_type: 'TRANSACTIONS'
     });
+    logActivity('Test webhook fired successfully', 'plaid');
   } catch (error) {
-    console.error('Initialization error:', error);
+    logActivity(`Initialization error: ${error.message}`, 'error');
   }
 };
 

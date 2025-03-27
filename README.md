@@ -33,7 +33,7 @@ cd zelle-to-stablecoin
 npm install
 ```
 
-3. Create a `.env` file in the root directory with your credentials:
+3. (Optional) Create a `.env` file in the root directory with your credentials:
 ```
 # Plaid credentials
 PLAID_CLIENT_ID=your_client_id
@@ -48,6 +48,8 @@ NORMIE_API_KEY=your_api_key
 DEFAULT_BLOCKCHAIN=Sepolia
 DEFAULT_WALLET_ADDRESS=0x...
 ```
+
+> **Note:** For quick testing, demo credentials are hardcoded in the application. You don't need to set up your own API keys to try it out.
 
 ## Usage
 
